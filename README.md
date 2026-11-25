@@ -1,529 +1,313 @@
-# Linux System Programming Practicals --- Python (Questions 4--12)
+# PROLOG Practical Programs — Solutions
 
-> **Language:** Python 3\
-> **Platform:** Linux / Ubuntu / WSL\
-> Save each program in a separate `.py` file and run with
-> `python3 filename.py`.
+> All programs are written in Prolog (compatible with SWI-Prolog). Copy each program into a `.pl` file or run it in the Prolog interpreter.
 
-------------------------------------------------------------------------
+## 1. Family Tree and Family Relationships
 
-## 4. Write a program using `fork()` and/or `exec()` commands where parent and child execute:
+**Question:** Write a PROLOG program to implement the family tree and demonstrate the family relationship.
 
-### (i) Same program, same code
+```prolog
+% Facts
+parent(john, mary).
+parent(john, tom).
+parent(mary, alice).
+parent(tom, bob).
 
-Both parent and child continue running the same code after `fork()`.
-They have separate process IDs.
+male(john).
+male(tom).
+male(bob).
 
-``` python
-import os
+female(mary).
+female(alice).
 
-pid = os.fork()
-
-print("Hello from process!")
-print("PID:", os.getpid())
-
-if pid == 0:
-    print("This is the child process.")
-else:
-    print("This is the parent process.")
+% Relationships
+father(X, Y) :- parent(X, Y), male(X).
+mother(X, Y) :- parent(X, Y), female(X).
+child(X, Y) :- parent(Y, X).
+sibling(X, Y) :- parent(P, X), parent(P, Y), X \= Y.
+grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
+grandchild(X, Y) :- grandparent(Y, X).
 ```
 
-**Explanation:** - `os.fork()` creates a child process. - After
-`fork()`, both parent and child continue from the next line. -
-`os.getpid()` returns the current process ID. - The `pid` return value
-is `0` in the child and the child's PID in the parent.
-
-**Run:**
-
-``` bash
-python3 same_program.py
+**Sample queries:**
+```prolog
+?- father(john, mary).
+?- sibling(mary, tom).
+?- grandparent(john, alice).
 ```
 
-### (ii) Same program, different code
+## 2. Concatenate Two Lists (`conc/3`)
 
-The parent and child are created from the same program, but each runs a
-different branch of code.
+**Question:** Write a PROLOG program to implement `conc(L1, L2, L3)` where `L2` is appended with `L1` to get `L3`.
 
-``` python
-import os
-
-pid = os.fork()
-
-if pid == 0:
-    print("Child process")
-    print("Child is executing its own code.")
-    print("Child PID:", os.getpid())
-else:
-    print("Parent process")
-    print("Parent is executing its own code.")
-    print("Parent PID:", os.getpid())
+```prolog
+conc([], L, L).
+conc([H|T], L2, [H|R]) :-
+    conc(T, L2, R).
 ```
 
-**Explanation:** - `fork()` creates a child process. - The child
-executes the `if` branch (`pid == 0`). - The parent executes the `else`
-branch. - Both processes originate from the same program but run
-different statements.
-
-**Run:**
-
-``` bash
-python3 different_code.py
+**Sample query:**
+```prolog
+?- conc([1,2], [3,4], R).
+% R = [1,2,3,4].
 ```
 
-### (iii) Parent waits for child to finish before terminating
+## 3. Reverse a List (`reverse/2`)
 
-``` python
-import os
+**Question:** Write a PROLOG program to implement `reverse(L, R)` where `L` is the original list and `R` is its reverse.
 
-pid = os.fork()
-
-if pid == 0:
-    print("Child process is running.")
-    print("Child PID:", os.getpid())
-    print("Child task completed.")
-    os._exit(0)
-else:
-    print("Parent is waiting for the child...")
-    os.wait()
-    print("Child has finished.")
-    print("Parent process terminates.")
+```prolog
+reverse([], []).
+reverse([H|T], R) :-
+    reverse(T, RT),
+    conc(RT, [H], R).
 ```
 
-**Explanation:** - `os.fork()` creates the child process. - `os.wait()`
-makes the parent wait until a child process exits. - After the child
-terminates, the parent continues and prints the final messages. -
-`os._exit(0)` exits the child process immediately without running
-inherited exit handlers.
-
-**Run:**
-
-``` bash
-python3 parent_wait.py
+**Sample query:**
+```prolog
+?- reverse([1,2,3,4], R).
+% R = [4,3,2,1].
 ```
 
-> **Note:** `fork()` is supported on Linux/Unix-like systems, not native
-> standard Windows. Run this practical in Linux, Ubuntu, or WSL.
+## 4. Sum of Two Numbers
 
-------------------------------------------------------------------------
+**Question:** Write a PROLOG program to calculate the sum of two numbers.
 
-## 5. Write a program to report Linux kernel behaviour/information including kernel version, CPU type and CPU information.
-
-``` python
-import platform
-
-print("Linux System Information")
-print("--------------------")
-print("System:", platform.system())
-print("Node:", platform.node())
-print("Kernel Release:", platform.release())
-print("Kernel Version:", platform.version())
-print("Machine/CPU Architecture:", platform.machine())
-print("Processor:", platform.processor() or "Not reported")
-
-print("\nCPU Information")
-print("-------------")
-
-try:
-    with open("/proc/cpuinfo", "r") as file:
-        for line in file:
-            if line.startswith(("model name", "Hardware", "processor", "cpu cores")):
-                print(line.strip())
-except OSError as e:
-    print("Unable to read CPU information:", e)
+```prolog
+sum_two(X, Y, S) :-
+    S is X + Y.
 ```
 
-**Explanation:** - The `platform` module reports operating system and
-kernel information. - `platform.release()` gives the kernel release. -
-`platform.machine()` reports the architecture (e.g., x86_64). -
-`/proc/cpuinfo` contains detailed CPU information on Linux.
-
-**Run:**
-
-``` bash
-python3 kernel_info.py
+**Sample query:**
+```prolog
+?- sum_two(5, 7, S).
+% S = 12.
 ```
 
-------------------------------------------------------------------------
+## 5. Maximum of Two Numbers (`max/3`)
 
-## 6. Write a program to report Linux memory information including configured memory, free and used memory.
+**Question:** Write a PROLOG program to implement `max(X, Y, M)` so that `M` is the maximum of `X` and `Y`.
 
-``` python
-def read_meminfo():
-    values = {}
-
-    with open("/proc/meminfo", "r") as file:
-        for line in file:
-            key, value = line.split(":", 1)
-            amount_kb = int(value.strip().split()[0])
-            values[key] = amount_kb
-
-    return values
-
-
-memory = read_meminfo()
-
-total = memory["MemTotal"]
-available = memory.get("MemAvailable", memory.get("MemFree", 0))
-used = total - available
-free = memory.get("MemFree", 0)
-
-print("Memory Information")
-print("----------------")
-print(f"Total RAM     : {total / 1024:.2f} MB")
-print(f"Free RAM      : {free / 1024:.2f} MB")
-print(f"Available RAM  : {available / 1024:.2f} MB")
-print(f"Used RAM      : {used / 1024:.2f} MB")
+```prolog
+max_num(X, Y, X) :-
+    X >= Y.
+max_num(X, Y, Y) :-
+    X < Y.
 ```
 
-**Explanation:** - `/proc/meminfo` contains memory statistics provided
-by the Linux kernel. - `MemTotal` is total physical RAM. - `MemFree` is
-RAM that is completely unused right now. - `MemAvailable` estimates
-memory available for new applications without swapping. - Used memory is
-estimated as `MemTotal - MemAvailable`.
-
-**Run:**
-
-``` bash
-python3 memory_info.py
+**Sample query:**
+```prolog
+?- max_num(8, 5, M).
+% M = 8.
 ```
 
-------------------------------------------------------------------------
+> Named `max_num/3` to avoid a conflict with built-in predicates in some Prolog implementations.
 
-## 7. Write a program to copy files using system calls.
+## 6. Factorial (`factorial/2`)
 
-``` python
-import os
-import sys
+**Question:** Write a program in PROLOG to implement `factorial(N, F)` where `F` represents the factorial of `N`.
 
-if len(sys.argv) != 3:
-    print("Usage: python3 file_copy.py source destination")
-    sys.exit(1)
-
-source_path = sys.argv[1]
-destination_path = sys.argv[2]
-
-try:
-    source_fd = os.open(source_path, os.O_RDONLY)
-    try:
-        destination_fd = os.open(
-            destination_path,
-            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-            0o644
-        )
-    except OSError:
-        os.close(source_fd)
-        raise
-
-    try:
-        while True:
-            data = os.read(source_fd, 4096)
-            if not data:
-                break
-
-            offset = 0
-            while offset < len(data):
-                written = os.write(destination_fd, data[offset:])
-                if written == 0:
-                    raise OSError("Write made no progress")
-                offset += written
-
-        print("File copied successfully.")
-
-    finally:
-        os.close(source_fd)
-        os.close(destination_fd)
-
-except OSError as error:
-    print("File copy failed:", error)
-    sys.exit(1)
+```prolog
+factorial(0, 1).
+factorial(N, F) :-
+    N > 0,
+    N1 is N - 1,
+    factorial(N1, F1),
+    F is N * F1.
 ```
 
-**Explanation:** - `os.open()` opens the source and destination files. -
-`os.read()` reads data from the source in chunks. - `os.write()` writes
-the data to the destination. - `os.close()` closes the file
-descriptors. - This demonstrates low-level file operations rather than
-using `shutil.copy()`.
-
-**Run:**
-
-``` bash
-python3 file_copy.py source.txt destination.txt
+**Sample query:**
+```prolog
+?- factorial(5, F).
+% F = 120.
 ```
 
-------------------------------------------------------------------------
+## 7. Fibonacci (`generate_fib/2`)
 
-## 8. Write a program to implement First Come First Serve (FCFS) scheduling algorithm.
+**Question:** Write a program in PROLOG to implement `generate_fib(N, T)` where `T` represents the Nth term of the Fibonacci series.
 
-> For simplicity, processes are assumed to arrive in the listed order at
-> time 0.
-
-``` python
-n = int(input("Enter number of processes: "))
-burst = []
-
-for i in range(n):
-    bt = int(input(f"Enter burst time for P{i + 1}: "))
-    burst.append(bt)
-
-waiting = [0] * n
-turnaround = [0] * n
-
-for i in range(1, n):
-    waiting[i] = waiting[i - 1] + burst[i - 1]
-
-for i in range(n):
-    turnaround[i] = waiting[i] + burst[i]
-
-print("\nProcess\tBurst\tWaiting\tTurnaround")
-for i in range(n):
-    print(f"P{i + 1}\t{burst[i]}\t{waiting[i]}\t{turnaround[i]}")
-
-avg_waiting = sum(waiting) / n
-avg_turnaround = sum(turnaround) / n
-
-print(f"\nAverage Waiting Time: {avg_waiting:.2f}")
-print(f"Average Turnaround Time: {avg_turnaround:.2f}")
+```prolog
+% Here, N = 0 gives the first term (0), N = 1 gives the second term (1).
+generate_fib(0, 0).
+generate_fib(1, 1).
+generate_fib(N, T) :-
+    N > 1,
+    N1 is N - 1,
+    N2 is N - 2,
+    generate_fib(N1, T1),
+    generate_fib(N2, T2),
+    T is T1 + T2.
 ```
 
-**Explanation:** - FCFS stands for First Come First Serve. - Processes
-execute in the order they are entered. - The first process has waiting
-time 0. - Each later process waits for the sum of the previous
-processes' burst times. - Turnaround Time = Waiting Time + Burst Time.
-
-**Run:**
-
-``` bash
-python3 fcfs.py
+**Sample query:**
+```prolog
+?- generate_fib(6, T).
+% T = 8.
 ```
 
-------------------------------------------------------------------------
+## 8. Power (`power/3`)
 
-## 9. Write a program to implement Shortest Job First (SJF) scheduling algorithm.
+**Question:** Write a PROLOG program to implement `power(Num, Pow, Ans)` where `Num` is raised to the power `Pow` to get `Ans`.
 
-> This program implements **non-preemptive SJF**. All processes are
-> assumed to arrive at time 0.
-
-``` python
-n = int(input("Enter number of processes: "))
-processes = []
-
-for i in range(n):
-    bt = int(input(f"Enter burst time for P{i + 1}: "))
-    processes.append([i + 1, bt])
-
-# Sort processes in ascending order of burst time
-processes.sort(key=lambda p: p[1])
-
-waiting = [0] * n
-turnaround = [0] * n
-
-for i in range(1, n):
-    waiting[i] = waiting[i - 1] + processes[i - 1][1]
-
-for i in range(n):
-    turnaround[i] = waiting[i] + processes[i][1]
-
-print("\nProcess\tBurst\tWaiting\tTurnaround")
-for i in range(n):
-    pid, bt = processes[i]
-    print(f"P{pid}\t{bt}\t{waiting[i]}\t{turnaround[i]}")
-
-print(f"\nAverage Waiting Time: {sum(waiting) / n:.2f}")
-print(f"Average Turnaround Time: {sum(turnaround) / n:.2f}")
+```prolog
+power(_, 0, 1).
+power(Num, Pow, Ans) :-
+    Pow > 0,
+    Pow1 is Pow - 1,
+    power(Num, Pow1, Ans1),
+    Ans is Num * Ans1.
 ```
 
-**Explanation:** - SJF selects the process with the shortest burst time
-first. - The processes are sorted by burst time in ascending order. -
-The process with the smallest burst time executes first. - Waiting time
-is calculated using the burst times of preceding processes. - Turnaround
-Time = Waiting Time + Burst Time.
-
-**Run:**
-
-``` bash
-python3 sjf.py
+**Sample query:**
+```prolog
+?- power(2, 4, Ans).
+% Ans = 16.
 ```
 
-------------------------------------------------------------------------
+## 9. Multiplication (`multi/3`)
 
-## 10. Write a program to implement non-preemptive priority-based scheduling algorithm.
+**Question:** Write a PROLOG program to implement `multi(N1, N2, R)` where `N1` and `N2` are the numbers to be multiplied and `R` represents the result.
 
-> A smaller priority number means higher priority. All processes are
-> assumed to arrive at time 0.
-
-``` python
-n = int(input("Enter number of processes: "))
-processes = []
-
-for i in range(n):
-    bt = int(input(f"Enter burst time for P{i + 1}: "))
-    priority = int(input(f"Enter priority for P{i + 1} (smaller number = higher priority): "))
-    processes.append([i + 1, bt, priority])
-
-# Sort by priority: lower number has higher priority
-processes.sort(key=lambda p: p[2])
-
-waiting = [0] * n
-turnaround = [0] * n
-
-for i in range(1, n):
-    waiting[i] = waiting[i - 1] + processes[i - 1][1]
-
-for i in range(n):
-    turnaround[i] = waiting[i] + processes[i][1]
-
-print("\nProcess\tPriority\tBurst\tWaiting\tTurnaround")
-for i in range(n):
-    pid, bt, priority = processes[i]
-    print(f"P{pid}\t{priority}\t{bt}\t{waiting[i]}\t{turnaround[i]}")
-
-print(f"\nAverage Waiting Time: {sum(waiting) / n:.2f}")
-print(f"Average Turnaround Time: {sum(turnaround) / n:.2f}")
+```prolog
+multi(N1, N2, R) :-
+    R is N1 * N2.
 ```
 
-**Explanation:** - Every process has a burst time and priority number. -
-The process with the highest priority runs first. - In this program, a
-smaller priority number represents higher priority. - It is
-non-preemptive: once a process begins, it runs until it finishes. -
-Turnaround Time = Waiting Time + Burst Time.
-
-**Run:**
-
-``` bash
-python3 priority.py
+**Sample query:**
+```prolog
+?- multi(6, 7, R).
+% R = 42.
 ```
 
-------------------------------------------------------------------------
+## 10. Membership (`memb/2`)
 
-## 11. Write a program to calculate sum of n numbers using Pthreads.
+**Question:** Write a PROLOG program to implement `memb(X, L)` to check whether `X` is a member of list `L` or not.
 
-> In Python, POSIX threads are accessed through the `threading` module.
-
-``` python
-import threading
-
-result = 0
-
-def calculate_sum(n):
-    global result
-    result = sum(range(1, n + 1))
-
-n = int(input("Enter n: "))
-
-if n < 0:
-    print("Enter a non-negative number.")
-else:
-    thread = threading.Thread(target=calculate_sum, args=(n,))
-    thread.start()
-    thread.join()
-
-    print(f"Sum of numbers from 1 to {n} = {result}")
+```prolog
+memb(X, [X|_]).
+memb(X, [_|T]) :-
+    memb(X, T).
 ```
 
-**Explanation:** - Python's `threading` module is used to create a
-thread. - `calculate_sum()` computes the sum from 1 to `n`. -
-`thread.start()` starts the thread's work. - `thread.join()` makes the
-main program wait until the thread completes. - The result is then
-printed.
+**Sample queries:**
+```prolog
+?- memb(3, [1,2,3,4]).
+% true.
 
-**Run:**
-
-``` bash
-python3 thread_sum.py
+?- memb(9, [1,2,3,4]).
+% false.
 ```
 
-------------------------------------------------------------------------
+## 11. Sum of a List (`sumlist/2`)
 
-## 12. Write a program to implement First Fit, Best Fit and Worst Fit allocation strategies.
+**Question:** Write a PROLOG program to implement `sumlist(L, S)` so that `S` is the sum of a given list `L`.
 
-``` python
-def allocate_memory(blocks, processes, strategy):
-    remaining = blocks.copy()
-    allocation = [-1] * len(processes)
-
-    for i, size in enumerate(processes):
-        candidates = [
-            j for j, block_size in enumerate(remaining)
-            if block_size >= size
-        ]
-
-        if not candidates:
-            continue
-
-        if strategy == "first":
-            chosen = candidates[0]
-        elif strategy == "best":
-            chosen = min(candidates, key=lambda j: remaining[j])
-        elif strategy == "worst":
-            chosen = max(candidates, key=lambda j: remaining[j])
-        else:
-            raise ValueError("Unknown allocation strategy")
-
-        allocation[i] = chosen
-        remaining[chosen] -= size
-
-    return allocation
-
-
-def display(strategy_name, allocation, processes):
-    print(f"\n{strategy_name}")
-    print("Process\tSize\tBlock")
-    for i, block in enumerate(allocation):
-        if block == -1:
-            print(f"P{i + 1}\t{processes[i]}\tNot Allocated")
-        else:
-            print(f"P{i + 1}\t{processes[i]}\tB{block + 1}")
-
-
-blocks = list(map(int, input("Enter memory block sizes separated by spaces: ").split()))
-processes = list(map(int, input("Enter process sizes separated by spaces: ").split()))
-
-first = allocate_memory(blocks, processes, "first")
-best = allocate_memory(blocks, processes, "best")
-worst = allocate_memory(blocks, processes, "worst")
-
-display("First Fit Allocation", first, processes)
-display("Best Fit Allocation", best, processes)
-display("Worst Fit Allocation", worst, processes)
+```prolog
+sumlist([], 0).
+sumlist([H|T], S) :-
+    sumlist(T, S1),
+    S is H + S1.
 ```
 
-**Explanation:** - **First Fit:** Allocates the first memory block that
-is large enough. - **Best Fit:** Allocates the smallest block that is
-large enough. - **Worst Fit:** Allocates the largest block that is large
-enough. - After allocation, the remaining space in the selected block is
-reduced by the process size. - Each strategy gets a fresh copy of the
-original block list for a fair comparison.
-
-**Run:**
-
-``` bash
-python3 memory_allocation.py
+**Sample query:**
+```prolog
+?- sumlist([1,2,3,4,5], S).
+% S = 15.
 ```
 
-------------------------------------------------------------------------
+## 12. Even and Odd Length Lists
 
-## Quick run commands
+**Question:** Write a PROLOG program to implement `evenlength(List)` and `oddlength(List)` so that they are true if their argument is a list of even or odd length respectively.
 
-For each program, save it with the filename shown in the Run section and
-execute:
+```prolog
+evenlength([]).
+evenlength([_,_|T]) :-
+    evenlength(T).
 
-``` bash
-python3 filename.py
+oddlength([_]).
+oddlength([_,_|T]) :-
+    oddlength(T).
 ```
 
-### Practical/Viva quick revision
+**Sample queries:**
+```prolog
+?- evenlength([a,b,c,d]).
+% true.
 
--   `os.fork()` creates a new child process on Linux/Unix.
--   `os.wait()` makes the parent wait for a child process to finish.
--   `platform` and `/proc/cpuinfo` help report Linux/kernel and CPU
-    information.
--   `/proc/meminfo` contains memory statistics.
--   `os.open()`, `os.read()`, `os.write()`, `os.close()` are low-level
-    file operations.
--   FCFS schedules processes in arrival/input order.
--   SJF selects the process with the shortest burst time.
--   Priority scheduling runs the highest-priority process first (here,
-    smaller number means higher priority).
--   Python `threading.Thread` creates and runs a thread; `join()` waits
-    for it.
--   First Fit, Best Fit, and Worst Fit are memory allocation strategies.
+?- oddlength([a,b,c]).
+% true.
+```
+
+## 13. Maximum Element in a List (`maxlist/2`)
+
+**Question:** Write a PROLOG program to implement `maxlist(L, M)` so that `M` is the maximum number in the list.
+
+```prolog
+maxlist([X], X).
+maxlist([H|T], M) :-
+    maxlist(T, M1),
+    ( H >= M1 -> M = H ; M = M1 ).
+```
+
+**Sample query:**
+```prolog
+?- maxlist([4,9,2,7,5], M).
+% M = 9.
+```
+
+> The list must contain at least one element.
+
+## 14. Insert an Item at Nth Position (`insert/4`)
+
+**Question:** Write a PROLOG program to implement `insert(I, N, L, R)` that inserts item `I` into the Nth position of list `L` to generate list `R`.
+
+```prolog
+% Positions are 1-based: insert at position 1 means insert at the beginning.
+insert(I, 1, L, [I|L]).
+insert(I, N, [H|T], [H|R]) :-
+    N > 1,
+    N1 is N - 1,
+    insert(I, N1, T, R).
+```
+
+**Sample query:**
+```prolog
+?- insert(x, 3, [a,b,c,d], R).
+% R = [a,b,x,c,d].
+```
+
+## 15. Delete the Nth Element (`delete/3`)
+
+**Question:** Write a PROLOG program to implement `delete(N, L, R)` that removes the element at the Nth position from list `L` to generate list `R`.
+
+```prolog
+% Positions are 1-based.
+delete(1, [_|T], T).
+delete(N, [H|T], [H|R]) :-
+    N > 1,
+    N1 is N - 1,
+    delete(N1, T, R).
+```
+
+**Sample query:**
+```prolog
+?- delete(3, [a,b,c,d,e], R).
+% R = [a,b,d,e].
+```
+
+---
+
+## How to Run in SWI-Prolog
+
+1. Install SWI-Prolog.
+2. Save a program into a file with a `.pl` extension (e.g., `practical1.pl`).
+3. Open SWI-Prolog and load the file:
+   ```prolog
+   ?- [practical1].
+   ```
+4. Run the sample query shown for the practical.
+5. To reload after editing, run:
+   ```prolog
+   ?- make.
+   ```
+
